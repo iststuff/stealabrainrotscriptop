@@ -1,48 +1,186 @@
+-- SERVICES
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
-local player = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("RunService")
+local camera = workspace.CurrentCamera
 
--- Create GUI
-local gui = Instance.new("ScreenGui")
+-- SETTINGS
+local player = Players.LocalPlayer
+local ACCESS_KEY = "3r00"
+local FLOAT_HEIGHT = 11
+local SPEED = 25
+local DETECTION_RADIUS = 3
+
+-- STATE
+local authorized = false
+local antiSlapEnabled = false
+
+-- CHARACTER REF
+local function getHRP()
+	local char = player.Character or player.CharacterAdded:Wait()
+	return char:WaitForChild("HumanoidRootPart")
+end
+local hrp = getHRP()
+
+-- GUI SETUP
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.Name = "FollowMeGUI"
 gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
 
--- Create Main Frame
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0.4, 0, 0.2, 0)
-frame.Position = UDim2.new(0.3, 0, 0.4, 0)
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0.4, 0, 0.3, 0)
+frame.Position = UDim2.new(0.3, 0, 0.35, 0)
 frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 frame.BorderSizePixel = 0
-frame.Parent = gui
 
--- Create Label
-local label = Instance.new("TextLabel")
-label.Size = UDim2.new(1, 0, 0.5, 0)
+local label = Instance.new("TextLabel", frame)
+label.Size = UDim2.new(1, 0, 0.35, 0)
 label.Position = UDim2.new(0, 0, 0, 0)
-label.Text = "⚠️ Follow heyheygivebackmyleg on Roblox to use this script ⚠️"
+label.Text = "⚠️ Follow heyheygivebackmyleg + Enter Key to use script ⚠️"
 label.TextColor3 = Color3.new(1, 0, 0)
 label.TextScaled = true
 label.Font = Enum.Font.GothamBlack
 label.BackgroundTransparency = 1
-label.Parent = frame
 
--- Create Button
-local button = Instance.new("TextButton")
-button.Size = UDim2.new(0.6, 0, 0.3, 0)
-button.Position = UDim2.new(0.2, 0, 0.6, 0)
-button.Text = "Run Script"
+local textbox = Instance.new("TextBox", frame)
+textbox.Size = UDim2.new(0.8, 0, 0.2, 0)
+textbox.Position = UDim2.new(0.1, 0, 0.4, 0)
+textbox.PlaceholderText = "Enter Access Key"
+textbox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+textbox.TextColor3 = Color3.new(1, 1, 1)
+textbox.TextScaled = true
+textbox.Font = Enum.Font.Gotham
+
+local button = Instance.new("TextButton", frame)
+button.Size = UDim2.new(0.6, 0, 0.2, 0)
+button.Position = UDim2.new(0.2, 0, 0.7, 0)
+button.Text = "Enable Anti Slap"
 button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 button.TextColor3 = Color3.new(1, 1, 1)
 button.Font = Enum.Font.Gotham
 button.TextScaled = true
-button.Parent = frame
 
--- On Click: Always show notification
+-- FUNCTION: Check distance to other players
+local function isPlayerTooClose()
+	for _, otherPlayer in ipairs(Players:GetPlayers()) do
+		if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			local dist = (hrp.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude
+			if dist <= DETECTION_RADIUS then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- ESP FUNCTION
+local function createESP(target)
+	local box = Drawing.new("Square")
+	box.Color = Color3.fromRGB(255, 0, 0)
+	box.Thickness = 2
+	box.Transparency = 1
+	box.Filled = false
+
+	local name = Drawing.new("Text")
+	name.Color = Color3.fromRGB(255, 255, 255)
+	name.Size = 16
+	name.Center = true
+	name.Outline = true
+
+	local function update()
+		if not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
+		local pos, onScreen = camera:WorldToViewportPoint(target.Character.HumanoidRootPart.Position)
+		if onScreen then
+			local size = math.clamp(1000 / (pos.Z + 1), 2, 200)
+			box.Size = Vector2.new(size, size * 1.5)
+			box.Position = Vector2.new(pos.X - size / 2, pos.Y - size * 0.75)
+			box.Visible = true
+
+			name.Text = target.DisplayName
+			name.Position = Vector2.new(pos.X, pos.Y - size)
+			name.Visible = true
+		else
+			box.Visible = false
+			name.Visible = false
+		end
+	end
+
+	local conn = RS.RenderStepped:Connect(update)
+
+	target.AncestryChanged:Connect(function()
+		conn:Disconnect()
+		box:Remove()
+		name:Remove()
+	end)
+end
+
+-- Create ESP for all players
+for _, other in ipairs(Players:GetPlayers()) do
+	if other ~= player then
+		createESP(other)
+	end
+end
+Players.PlayerAdded:Connect(function(p)
+	if p ~= player then
+		createESP(p)
+	end
+end)
+
+-- BUTTON BEHAVIOR
 button.MouseButton1Click:Connect(function()
-    StarterGui:SetCore("SendNotification", {
-        Title = "Access Denied";
-        Text = "Follow heyheygivebackmyleg on Roblox to use this script!";
-        Duration = 6;
-    })
+	local key = textbox.Text
+	if key == ACCESS_KEY then
+		authorized = true
+		frame:Destroy()
+		StarterGui:SetCore("SendNotification", {
+			Title = "Anti Slap Ready";
+			Text = "Stay safe from nearby players.";
+			Duration = 5;
+		})
+	else
+		StarterGui:SetCore("SendNotification", {
+			Title = "Invalid Key";
+			Text = "Please follow & enter the correct key.";
+			Duration = 5;
+		})
+	end
+end)
+
+-- MAIN LOOP
+RS:BindToRenderStep("AntiSlapFloat", Enum.RenderPriority.Character.Value + 1, function()
+	if authorized then
+		local tooClose = isPlayerTooClose()
+
+		if tooClose and not antiSlapEnabled then
+			antiSlapEnabled = true
+			StarterGui:SetCore("SendNotification", {
+				Title = "Anti Slap Activated";
+				Text = "Floating to avoid contact!";
+				Duration = 3;
+			})
+		elseif not tooClose and antiSlapEnabled then
+			antiSlapEnabled = false
+			StarterGui:SetCore("SendNotification", {
+				Title = "Anti Slap Deactivated";
+				Text = "Safe distance. Float off.";
+				Duration = 3;
+			})
+		end
+
+		if antiSlapEnabled and player.Character then
+			local camCF = camera.CFrame
+			local moveVec = Vector3.new()
+
+			if UIS:IsKeyDown(Enum.KeyCode.W) then moveVec += camCF.LookVector end
+			if UIS:IsKeyDown(Enum.KeyCode.S) then moveVec -= camCF.LookVector end
+			if UIS:IsKeyDown(Enum.KeyCode.A) then moveVec -= camCF.RightVector end
+			if UIS:IsKeyDown(Enum.KeyCode.D) then moveVec += camCF.RightVector end
+
+			moveVec = Vector3.new(moveVec.X, 0, moveVec.Z).Unit * SPEED
+
+			local yOffset = FLOAT_HEIGHT - (hrp.Position.Y - workspace.FallenPartsDestroyHeight)
+			hrp.Velocity = Vector3.new(moveVec.X, yOffset * 2, moveVec.Z)
+		end
+	end
 end)
