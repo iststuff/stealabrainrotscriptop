@@ -1,0 +1,48 @@
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local player = Players.LocalPlayer
+
+-- Create GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "FollowMeGUI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- Create Main Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0.4, 0, 0.2, 0)
+frame.Position = UDim2.new(0.3, 0, 0.4, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+frame.Parent = gui
+
+-- Create Label
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 0.5, 0)
+label.Position = UDim2.new(0, 0, 0, 0)
+label.Text = "⚠️ Follow heyheygivebackmyleg on Roblox to use this script ⚠️"
+label.TextColor3 = Color3.new(1, 0, 0)
+label.TextScaled = true
+label.Font = Enum.Font.GothamBlack
+label.BackgroundTransparency = 1
+label.Parent = frame
+
+-- Create Button
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0.6, 0, 0.3, 0)
+button.Position = UDim2.new(0.2, 0, 0.6, 0)
+button.Text = "Run Script"
+button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+button.TextColor3 = Color3.new(1, 1, 1)
+button.Font = Enum.Font.Gotham
+button.TextScaled = true
+button.Parent = frame
+
+-- On Click: Always show notification
+button.MouseButton1Click:Connect(function()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Access Denied";
+        Text = "Follow heyheygivebackmyleg on Roblox to use this script!";
+        Duration = 6;
+    })
+end)
