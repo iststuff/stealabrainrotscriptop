@@ -1,23 +1,30 @@
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
--- === Settings ===
-local floatHeight = 12
-local floatSpeed = 20
-local teleportDistance = 5
-local floating = false
+-- Settings
+local floatHeightOffset = 12
+local floatSpeed = 16
+local teleportDistance = 7
 
--- === Create GUI ===
+local floating = false
+local hrp = nil
+local humanoid = nil
+
+local bodyPos = nil
+local bodyVel = nil
+
+-- GUI Setup
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "StealABrainrotGUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Draggable main frame
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 380, 0, 260)
 frame.Position = UDim2.new(0.5, -190, 0.4, -130)
@@ -27,7 +34,6 @@ frame.Active = true
 frame.Draggable = true
 frame.Parent = ScreenGui
 
--- Title bar
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
@@ -37,14 +43,12 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 22
 title.Parent = frame
 
--- Tabs container
 local tabsFrame = Instance.new("Frame")
 tabsFrame.Size = UDim2.new(1, 0, 0, 30)
 tabsFrame.Position = UDim2.new(0, 0, 0, 30)
 tabsFrame.BackgroundTransparency = 1
 tabsFrame.Parent = frame
 
--- Create tab buttons and pages
 local tabs = {"Main", "Visual", "Misc"}
 local tabButtons = {}
 local pages = {}
@@ -78,7 +82,6 @@ for i, name in ipairs(tabs) do
     pages[name] = createPage()
 end
 
--- Switch tabs function
 local function switchTab(tabName)
     for name, page in pairs(pages) do
         page.Visible = (name == tabName)
@@ -87,17 +90,15 @@ local function switchTab(tabName)
 end
 switchTab("Main")
 
--- Connect tab buttons click
 for name, btn in pairs(tabButtons) do
     btn.MouseButton1Click:Connect(function()
         switchTab(name)
     end)
 end
 
--- === Main Tab ===
+-- Main Tab UI
 local mainPage = pages["Main"]
 
--- Float Toggle Button
 local floatToggle = Instance.new("TextButton")
 floatToggle.Size = UDim2.new(0, 180, 0, 40)
 floatToggle.Position = UDim2.new(0.5, -90, 0, 20)
@@ -108,7 +109,6 @@ floatToggle.TextSize = 20
 floatToggle.Text = "Toggle Float (Q)"
 floatToggle.Parent = mainPage
 
--- Speed Input Label
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(0, 100, 0, 30)
 speedLabel.Position = UDim2.new(0, 40, 0, 80)
@@ -120,7 +120,6 @@ speedLabel.Text = "Speed:"
 speedLabel.TextXAlignment = Enum.TextXAlignment.Left
 speedLabel.Parent = mainPage
 
--- Speed TextBox
 local speedBox = Instance.new("TextBox")
 speedBox.Size = UDim2.new(0, 100, 0, 30)
 speedBox.Position = UDim2.new(0, 140, 0, 80)
@@ -144,11 +143,9 @@ speedBox.FocusLost:Connect(function(enterPressed)
     end
 end)
 
--- === Visual Tab ===
+-- Visual Tab UI
 local visualPage = pages["Visual"]
 
--- ESP toggle
-local espEnabled = false
 local espToggle = Instance.new("TextButton")
 espToggle.Size = UDim2.new(0, 180, 0, 40)
 espToggle.Position = UDim2.new(0.5, -90, 0, 20)
@@ -159,21 +156,20 @@ espToggle.TextSize = 20
 espToggle.Text = "Toggle ESP"
 espToggle.Parent = visualPage
 
--- ESP Drawing Setup
+local espEnabled = false
 local espBoxes = {}
 
 local function createESPForPlayer(plr)
     if espBoxes[plr] then return end
-
     local box = Drawing.new("Square")
-    box.Color = Color3.fromRGB(0, 255, 0)
+    box.Color = Color3.fromRGB(0,255,0)
     box.Thickness = 2
     box.Filled = false
     box.Visible = false
 
     local name = Drawing.new("Text")
     name.Text = plr.Name
-    name.Color = Color3.fromRGB(0, 255, 0)
+    name.Color = Color3.fromRGB(0,255,0)
     name.Size = 14
     name.Center = true
     name.Outline = true
@@ -250,7 +246,7 @@ end)
 
 RunService.RenderStepped:Connect(updateESP)
 
--- === Misc Tab ===
+-- Misc Tab UI
 local miscPage = pages["Misc"]
 
 local teleportLabel = Instance.new("TextLabel")
@@ -260,63 +256,70 @@ teleportLabel.BackgroundTransparency = 1
 teleportLabel.TextColor3 = Color3.new(1,1,1)
 teleportLabel.Font = Enum.Font.Gotham
 teleportLabel.TextSize = 18
-teleportLabel.Text = "Press E to teleport 5 studs forward"
+teleportLabel.Text = "Press T to teleport 7 studs forward"
 teleportLabel.Parent = miscPage
 
--- === Float Logic ===
-local floatPart = nil
-local floatBodyVelocity = nil
-
+-- Floating functions
 local function startFloating()
-    if floating or not player.Character then return end
-    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+    if floating then return end
+    if not player.Character then return end
+    hrp = player.Character:FindFirstChild("HumanoidRootPart")
+    humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return end
 
-    -- Create invisible floating part
-    floatPart = Instance.new("Part")
-    floatPart.Size = Vector3.new(2,2,2)
-    floatPart.Transparency = 1
-    floatPart.Anchored = true
-    floatPart.CanCollide = false
-    floatPart.Position = hrp.Position + Vector3.new(0, floatHeight, 0)
-    floatPart.Parent = workspace
+    humanoid.PlatformStand = true
 
-    -- Weld floatPart to HumanoidRootPart
-    local weld = Instance.new("WeldConstraint")
-    weld.Part0 = hrp
-    weld.Part1 = floatPart
-    weld.Parent = floatPart
+    -- Teleport up instantly by 12 studs
+    local currentPos = hrp.Position
+    local targetPos = Vector3.new(currentPos.X, currentPos.Y + floatHeightOffset, currentPos.Z)
+    hrp.CFrame = CFrame.new(targetPos)
 
-    -- Add BodyVelocity to control movement
-    floatBodyVelocity = Instance.new("BodyVelocity")
-    floatBodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-    floatBodyVelocity.Velocity = Vector3.new(0,0,0)
-    floatBodyVelocity.Parent = floatPart
+    -- Lock vertical position exactly at new height
+    bodyPos = Instance.new("BodyPosition")
+    bodyPos.Name = "FloatBodyPosition"
+    bodyPos.MaxForce = Vector3.new(0, 1e5, 0) -- vertical only
+    bodyPos.P = 1e4
+    bodyPos.D = 1e3
+    bodyPos.Position = targetPos
+    bodyPos.Parent = hrp
+
+    -- Horizontal movement
+    bodyVel = Instance.new("BodyVelocity")
+    bodyVel.Name = "FloatBodyVelocity"
+    bodyVel.MaxForce = Vector3.new(1e5, 0, 1e5) -- horizontal only
+    bodyVel.P = 1e4
+    bodyVel.Velocity = Vector3.new(0, 0, 0)
+    bodyVel.Parent = hrp
 
     floating = true
 end
 
 local function stopFloating()
     if not floating then return end
-    if floatBodyVelocity then
-        floatBodyVelocity:Destroy()
-        floatBodyVelocity = nil
-    end
-    if floatPart then
-        floatPart:Destroy()
-        floatPart = nil
-    end
     floating = false
+
+    if bodyPos and bodyPos.Parent then
+        bodyPos:Destroy()
+    end
+    if bodyVel and bodyVel.Parent then
+        bodyVel:Destroy()
+    end
+    if humanoid then
+        humanoid.PlatformStand = false
+    end
 end
 
 RunService.Heartbeat:Connect(function()
-    if floating and floatBodyVelocity and floatPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = player.Character.HumanoidRootPart
-        local camCF = workspace.CurrentCamera.CFrame
+    if floating and hrp and bodyPos and bodyVel then
+        -- Keep Y locked to the float height (simulate platform)
+        bodyPos.Position = Vector3.new(hrp.Position.X, bodyPos.Position.Y, hrp.Position.Z)
+
+        -- Camera relative horizontal movement
+        local camCF = camera.CFrame
         local forward = camCF.LookVector
         local right = camCF.RightVector
 
-        local moveVec = Vector3.new(0,0,0)
+        local moveVec = Vector3.new()
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec += forward end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec -= forward end
         if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec -= right end
@@ -327,12 +330,12 @@ RunService.Heartbeat:Connect(function()
             moveVec = moveVec.Unit * floatSpeed
         end
 
-        floatBodyVelocity.Velocity = Vector3.new(moveVec.X, 0, moveVec.Z)
-        floatPart.Position = hrp.Position + Vector3.new(0, floatHeight, 0)
+        bodyVel.Velocity = Vector3.new(moveVec.X, 0, moveVec.Z)
+    elseif bodyVel and bodyVel.Parent then
+        bodyVel.Velocity = Vector3.new(0, 0, 0)
     end
 end)
 
--- Keybinds: Q to toggle float, E to teleport forward smoothly
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
 
@@ -342,7 +345,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         else
             startFloating()
         end
-    elseif input.KeyCode == Enum.KeyCode.E then
+    elseif input.KeyCode == Enum.KeyCode.T then
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = player.Character.HumanoidRootPart
             local forwardVector = hrp.CFrame.LookVector
@@ -354,4 +357,12 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("Steal a Brainrot Helper GUI loaded! Q = float toggle, E = teleport forward, Visual tab = ESP toggle.")
+floatToggle.MouseButton1Click:Connect(function()
+    if floating then
+        stopFloating()
+    else
+        startFloating()
+    end
+end)
+
+print("Steal a Brainrot Helper loaded! Use Q to toggle float, T to teleport forward, toggle ESP in Visual tab.")
