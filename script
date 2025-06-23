@@ -3,16 +3,13 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 local camera = workspace.CurrentCamera
 
--- === Variables ===
+-- === Settings ===
 local floatHeight = 12
 local floatSpeed = 20
 local teleportDistance = 5
 local floating = false
-local floatPart = nil
-local floatBodyVelocity = nil
 
 -- === Create GUI ===
 local ScreenGui = Instance.new("ScreenGui")
@@ -20,7 +17,7 @@ ScreenGui.Name = "StealABrainrotGUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Draggable frame
+-- Draggable main frame
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 380, 0, 260)
 frame.Position = UDim2.new(0.5, -190, 0.4, -130)
@@ -30,7 +27,7 @@ frame.Active = true
 frame.Draggable = true
 frame.Parent = ScreenGui
 
--- Title
+-- Title bar
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
@@ -40,14 +37,14 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 22
 title.Parent = frame
 
--- Tab Buttons container
+-- Tabs container
 local tabsFrame = Instance.new("Frame")
 tabsFrame.Size = UDim2.new(1, 0, 0, 30)
 tabsFrame.Position = UDim2.new(0, 0, 0, 30)
 tabsFrame.BackgroundTransparency = 1
 tabsFrame.Parent = frame
 
--- Tab Buttons
+-- Create tab buttons and pages
 local tabs = {"Main", "Visual", "Misc"}
 local tabButtons = {}
 local pages = {}
@@ -90,8 +87,14 @@ local function switchTab(tabName)
 end
 switchTab("Main")
 
--- ===== Main Tab =====
+-- Connect tab buttons click
+for name, btn in pairs(tabButtons) do
+    btn.MouseButton1Click:Connect(function()
+        switchTab(name)
+    end)
+end
 
+-- === Main Tab ===
 local mainPage = pages["Main"]
 
 -- Float Toggle Button
@@ -141,17 +144,7 @@ speedBox.FocusLost:Connect(function(enterPressed)
     end
 end)
 
--- Auto Update Float Speed while floating
-local function updateFloatSpeed(speed)
-    if floatBodyVelocity then
-        floatBodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    end
-end
-
--- Auto Stealth teleport in Misc tab will come later
-
--- ===== Visual Tab =====
-
+-- === Visual Tab ===
 local visualPage = pages["Visual"]
 
 -- ESP toggle
@@ -166,10 +159,12 @@ espToggle.TextSize = 20
 espToggle.Text = "Toggle ESP"
 espToggle.Parent = visualPage
 
--- ESP Drawing
+-- ESP Drawing Setup
 local espBoxes = {}
 
 local function createESPForPlayer(plr)
+    if espBoxes[plr] then return end
+
     local box = Drawing.new("Square")
     box.Color = Color3.fromRGB(0, 255, 0)
     box.Thickness = 2
@@ -197,18 +192,18 @@ end
 
 local function updateESP()
     if not espEnabled then
-        for plr, data in pairs(espBoxes) do
+        for _, data in pairs(espBoxes) do
             data.box.Visible = false
             data.name.Visible = false
         end
         return
     end
 
-    local camera = workspace.CurrentCamera
+    local cam = workspace.CurrentCamera
     for plr, data in pairs(espBoxes) do
         if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr ~= player then
             local hrp = plr.Character.HumanoidRootPart
-            local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+            local pos, onScreen = cam:WorldToViewportPoint(hrp.Position)
             if onScreen then
                 local size = math.clamp(300 / pos.Z, 20, 100)
                 data.box.Size = Vector2.new(size, size * 1.5)
@@ -233,7 +228,7 @@ espToggle.MouseButton1Click:Connect(function()
     if espEnabled then
         for _, plr in pairs(Players:GetPlayers()) do
             if plr ~= player then
-                if not espBoxes[plr] then createESPForPlayer(plr) end
+                createESPForPlayer(plr)
             end
         end
     else
@@ -255,11 +250,9 @@ end)
 
 RunService.RenderStepped:Connect(updateESP)
 
--- ===== Misc Tab =====
-
+-- === Misc Tab ===
 local miscPage = pages["Misc"]
 
--- Teleport Forward Button Label
 local teleportLabel = Instance.new("TextLabel")
 teleportLabel.Size = UDim2.new(1, 0, 0, 40)
 teleportLabel.Position = UDim2.new(0, 0, 0, 20)
@@ -270,16 +263,16 @@ teleportLabel.TextSize = 18
 teleportLabel.Text = "Press E to teleport 5 studs forward"
 teleportLabel.Parent = miscPage
 
--- Float control handled via Q key in UserInputService
-
 -- === Float Logic ===
+local floatPart = nil
+local floatBodyVelocity = nil
 
 local function startFloating()
     if floating or not player.Character then return end
     local hrp = player.Character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    -- Create invisible part to hold player afloat
+    -- Create invisible floating part
     floatPart = Instance.new("Part")
     floatPart.Size = Vector3.new(2,2,2)
     floatPart.Transparency = 1
@@ -296,8 +289,8 @@ local function startFloating()
 
     -- Add BodyVelocity to control movement
     floatBodyVelocity = Instance.new("BodyVelocity")
+    floatBodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
     floatBodyVelocity.Velocity = Vector3.new(0,0,0)
-    floatBodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
     floatBodyVelocity.Parent = floatPart
 
     floating = true
@@ -316,37 +309,30 @@ local function stopFloating()
     floating = false
 end
 
--- Update floating movement every frame
 RunService.Heartbeat:Connect(function()
     if floating and floatBodyVelocity and floatPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = player.Character.HumanoidRootPart
-        local moveDir = Vector3.new(0,0,0)
-
-        -- WASD movement relative to camera
         local camCF = workspace.CurrentCamera.CFrame
         local forward = camCF.LookVector
         local right = camCF.RightVector
 
-        local move = Vector3.new(0,0,0)
+        local moveVec = Vector3.new(0,0,0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec += forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec -= forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec -= right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec += right end
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + forward end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - forward end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - right end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + right end
-
-        move = Vector3.new(move.X, 0, move.Z)
-        if move.Magnitude > 0 then
-            move = move.Unit * floatSpeed
+        moveVec = Vector3.new(moveVec.X, 0, moveVec.Z)
+        if moveVec.Magnitude > 0 then
+            moveVec = moveVec.Unit * floatSpeed
         end
 
-        -- Apply velocity for smooth floating movement
-        floatBodyVelocity.Velocity = Vector3.new(move.X, 0, move.Z)
-        -- Keep floatPart at fixed height above player root
+        floatBodyVelocity.Velocity = Vector3.new(moveVec.X, 0, moveVec.Z)
         floatPart.Position = hrp.Position + Vector3.new(0, floatHeight, 0)
     end
 end)
 
--- Keybinds for toggle float and teleport forward
+-- Keybinds: Q to toggle float, E to teleport forward smoothly
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
 
@@ -361,7 +347,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             local hrp = player.Character.HumanoidRootPart
             local forwardVector = hrp.CFrame.LookVector
             local targetPos = hrp.Position + forwardVector * teleportDistance
-            -- Tween to new position for smooth teleport
             local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
             local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos)})
             tween:Play()
@@ -369,6 +354,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- === Final Touches ===
-
-print("Steal a Brainrot Helper GUI loaded. Use Q to toggle float, E to teleport forward, and Visual tab to toggle ESP.")
+print("Steal a Brainrot Helper GUI loaded! Q = float toggle, E = teleport forward, Visual tab = ESP toggle.")
