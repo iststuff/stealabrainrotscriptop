@@ -3,101 +3,200 @@ local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
+local RunService = RS
+local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
 -- SETTINGS
-local player = Players.LocalPlayer
 local ACCESS_KEY = "3r00"
-local FLOAT_HEIGHT = 11
-local SPEED = 25
-local DETECTION_RADIUS = 3
+local authorized = false
 
 -- STATE
-local authorized = false
-local antiSlapEnabled = false
+local floatEnabled = false
+local autoStealerEnabled = false
+local espEnabled = false
+local speedValue = 20 -- default speed for float
+local userSpeedValue = speedValue
 
--- CHARACTER REF
+-- References
+local hrp = nil
+local gui = nil
+
+-- UTIL: Get HRP safely
 local function getHRP()
 	local char = player.Character or player.CharacterAdded:Wait()
 	return char:WaitForChild("HumanoidRootPart")
 end
-local hrp = getHRP()
 
--- GUI SETUP
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "FollowMeGUI"
-gui.ResetOnSpawn = false
-
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0.4, 0, 0.3, 0)
-frame.Position = UDim2.new(0.3, 0, 0.35, 0)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-frame.BorderSizePixel = 0
-
-local label = Instance.new("TextLabel", frame)
-label.Size = UDim2.new(1, 0, 0.35, 0)
-label.Position = UDim2.new(0, 0, 0, 0)
-label.Text = "⚠️ Follow heyheygivebackmyleg + Enter Key to use script ⚠️"
-label.TextColor3 = Color3.new(1, 0, 0)
-label.TextScaled = true
-label.Font = Enum.Font.GothamBlack
-label.BackgroundTransparency = 1
-
-local textbox = Instance.new("TextBox", frame)
-textbox.Size = UDim2.new(0.8, 0, 0.2, 0)
-textbox.Position = UDim2.new(0.1, 0, 0.4, 0)
-textbox.PlaceholderText = "Enter Access Key"
-textbox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-textbox.TextColor3 = Color3.new(1, 1, 1)
-textbox.TextScaled = true
-textbox.Font = Enum.Font.Gotham
-
-local button = Instance.new("TextButton", frame)
-button.Size = UDim2.new(0.6, 0, 0.2, 0)
-button.Position = UDim2.new(0.2, 0, 0.7, 0)
-button.Text = "Enable Anti Slap"
-button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-button.TextColor3 = Color3.new(1, 1, 1)
-button.Font = Enum.Font.Gotham
-button.TextScaled = true
-
--- FUNCTION: Check distance to other players
-local function isPlayerTooClose()
-	for _, otherPlayer in ipairs(Players:GetPlayers()) do
-		if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
-			local dist = (hrp.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude
-			if dist <= DETECTION_RADIUS then
-				return true
-			end
-		end
-	end
-	return false
+-- Remove old GUI if exists
+if player.PlayerGui:FindFirstChild("CustomFloatGui") then
+	player.PlayerGui.CustomFloatGui:Destroy()
 end
 
--- ESP FUNCTION
-local function createESP(target)
+-- Create main GUI
+gui = Instance.new("ScreenGui")
+gui.Name = "CustomFloatGui"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- UI Layout Helpers
+local function createTabButton(name, posX)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0, 100, 0, 30)
+	btn.Position = UDim2.new(posX, 0, 0, 0)
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	btn.Text = name
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.Gotham
+	btn.Parent = gui
+	return btn
+end
+
+local mainBtn = createTabButton("Main", 0)
+local visualBtn = createTabButton("Visual", 0.14)
+local miscBtn = createTabButton("Misc", 0.28)
+
+-- Create frames for each tab
+local function createTabFrame()
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(0, 350, 0, 250)
+	frame.Position = UDim2.new(0.35, 0, 0, 40)
+	frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	frame.BorderSizePixel = 0
+	frame.Visible = false
+	frame.Parent = gui
+	return frame
+end
+
+local mainFrame = createTabFrame()
+local visualFrame = createTabFrame()
+local miscFrame = createTabFrame()
+
+-- Show main tab by default
+mainFrame.Visible = true
+
+-- Tab switching
+local function showTab(tabFrame)
+	mainFrame.Visible = false
+	visualFrame.Visible = false
+	miscFrame.Visible = false
+	tabFrame.Visible = true
+end
+
+mainBtn.MouseButton1Click:Connect(function() showTab(mainFrame) end)
+visualBtn.MouseButton1Click:Connect(function() showTab(visualFrame) end)
+miscBtn.MouseButton1Click:Connect(function() showTab(miscFrame) end)
+
+-- Helper to create buttons
+local function createButton(parent, text, posY)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0, 150, 0, 40)
+	btn.Position = UDim2.new(0, 10, 0, posY)
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	btn.Text = text
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.Gotham
+	btn.Parent = parent
+	return btn
+end
+
+-- Helper to create textboxes
+local function createTextbox(parent, placeholder, posY)
+	local tb = Instance.new("TextBox")
+	tb.Size = UDim2.new(0, 100, 0, 30)
+	tb.Position = UDim2.new(0, 180, 0, posY+5)
+	tb.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	tb.TextColor3 = Color3.new(1,1,1)
+	tb.PlaceholderText = placeholder
+	tb.TextScaled = true
+	tb.Font = Enum.Font.Gotham
+	tb.Parent = parent
+	return tb
+end
+
+-- Main Tab UI
+local floatToggleBtn = createButton(mainFrame, "Toggle Float (Q)", 10)
+local speedInput = createTextbox(mainFrame, "Speed (default 20)", 60)
+local speedToggleBtn = createButton(mainFrame, "Set Speed", 100)
+local autoStealerBtn = createButton(mainFrame, "Toggle Auto Stealer (E)", 150)
+
+-- Visual Tab UI
+local espToggleBtn = createButton(visualFrame, "Toggle ESP", 10)
+
+-- Misc Tab UI
+local teleportBtn = createButton(miscFrame, "Teleport to Baseplate", 10)
+
+-- Key Input GUI (simple prompt)
+local keyGui = Instance.new("ScreenGui")
+keyGui.Name = "KeyGui"
+keyGui.ResetOnSpawn = false
+keyGui.Parent = player:WaitForChild("PlayerGui")
+
+local keyFrame = Instance.new("Frame")
+keyFrame.Size = UDim2.new(0, 300, 0, 150)
+keyFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+keyFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+keyFrame.BorderSizePixel = 0
+keyFrame.Parent = keyGui
+
+local keyLabel = Instance.new("TextLabel")
+keyLabel.Size = UDim2.new(1, 0, 0.3, 0)
+keyLabel.Position = UDim2.new(0, 0, 0, 10)
+keyLabel.Text = "Enter Access Key:"
+keyLabel.TextColor3 = Color3.new(1, 1, 1)
+keyLabel.TextScaled = true
+keyLabel.BackgroundTransparency = 1
+keyLabel.Font = Enum.Font.GothamBold
+keyLabel.Parent = keyFrame
+
+local keyBox = Instance.new("TextBox")
+keyBox.Size = UDim2.new(0.8, 0, 0.3, 0)
+keyBox.Position = UDim2.new(0.1, 0, 0.4, 0)
+keyBox.PlaceholderText = "Key here"
+keyBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+keyBox.TextColor3 = Color3.new(1,1,1)
+keyBox.TextScaled = true
+keyBox.Font = Enum.Font.Gotham
+keyBox.Parent = keyFrame
+keyBox.ClearTextOnFocus = true
+
+local keySubmit = createButton(keyFrame, "Submit", 100)
+
+-- ESP SYSTEM --
+local espBoxes = {}
+
+local function createESP(plr)
+	if espBoxes[plr] then return end
 	local box = Drawing.new("Square")
-	box.Color = Color3.fromRGB(255, 0, 0)
+	box.Color = Color3.fromRGB(255,0,0)
 	box.Thickness = 2
-	box.Transparency = 1
 	box.Filled = false
+	box.Transparency = 1
 
 	local name = Drawing.new("Text")
-	name.Color = Color3.fromRGB(255, 255, 255)
+	name.Color = Color3.new(1,1,1)
 	name.Size = 16
 	name.Center = true
 	name.Outline = true
 
+	espBoxes[plr] = {box = box, name = name}
+
 	local function update()
-		if not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
-		local pos, onScreen = camera:WorldToViewportPoint(target.Character.HumanoidRootPart.Position)
+		if not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then
+			box.Visible = false
+			name.Visible = false
+			return
+		end
+		local pos, onScreen = camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
 		if onScreen then
-			local size = math.clamp(1000 / (pos.Z + 1), 2, 200)
-			box.Size = Vector2.new(size, size * 1.5)
-			box.Position = Vector2.new(pos.X - size / 2, pos.Y - size * 0.75)
+			local size = math.clamp(1000 / (pos.Z + 1), 20, 200)
+			box.Size = Vector2.new(size, size*1.5)
+			box.Position = Vector2.new(pos.X - size/2, pos.Y - size*0.75)
 			box.Visible = true
 
-			name.Text = target.DisplayName
+			name.Text = plr.DisplayName
 			name.Position = Vector2.new(pos.X, pos.Y - size)
 			name.Visible = true
 		else
@@ -106,81 +205,204 @@ local function createESP(target)
 		end
 	end
 
-	local conn = RS.RenderStepped:Connect(update)
-
-	target.AncestryChanged:Connect(function()
-		conn:Disconnect()
-		box:Remove()
-		name:Remove()
-	end)
+	return RunService.RenderStepped:Connect(update)
 end
 
--- Create ESP for all players
-for _, other in ipairs(Players:GetPlayers()) do
-	if other ~= player then
-		createESP(other)
+local espConnections = {}
+
+local function toggleESP(state)
+	if state then
+		for _,plr in pairs(Players:GetPlayers()) do
+			if plr ~= player then
+				espConnections[plr] = createESP(plr)
+			end
+		end
+		Players.PlayerAdded:Connect(function(plr)
+			if plr ~= player and espEnabled then
+				espConnections[plr] = createESP(plr)
+			end
+		end)
+		Players.PlayerRemoving:Connect(function(plr)
+			if espConnections[plr] then
+				espConnections[plr]:Disconnect()
+				espBoxes[plr].box:Remove()
+				espBoxes[plr].name:Remove()
+				espConnections[plr] = nil
+				espBoxes[plr] = nil
+			end
+		end)
+	else
+		for _, conn in pairs(espConnections) do
+			conn:Disconnect()
+		end
+		for _, esp in pairs(espBoxes) do
+			esp.box:Remove()
+			esp.name:Remove()
+		end
+		espConnections = {}
+		espBoxes = {}
 	end
 end
-Players.PlayerAdded:Connect(function(p)
-	if p ~= player then
-		createESP(p)
-	end
-end)
 
--- BUTTON BEHAVIOR
-button.MouseButton1Click:Connect(function()
-	local key = textbox.Text
-	if key == ACCESS_KEY then
+-- FLOAT SYSTEM --
+local function applyFloatMovement()
+	if not floatEnabled then return end
+	hrp = hrp or getHRP()
+	if not hrp then return end
+
+	local camCF = camera.CFrame
+	local moveVec = Vector3.new()
+
+	if UIS:IsKeyDown(Enum.KeyCode.W) then moveVec += camCF.LookVector end
+	if UIS:IsKeyDown(Enum.KeyCode.S) then moveVec -= camCF.LookVector end
+	if UIS:IsKeyDown(Enum.KeyCode.A) then moveVec -= camCF.RightVector end
+	if UIS:IsKeyDown(Enum.KeyCode.D) then moveVec += camCF.RightVector end
+
+	if moveVec.Magnitude > 0 then
+		moveVec = Vector3.new(moveVec.X, 0, moveVec.Z).Unit * userSpeedValue
+	else
+		moveVec = Vector3.new(0,0,0)
+	end
+
+	local goalY = FLOAT_HEIGHT or 11
+	local yOffset = goalY - (hrp.Position.Y - workspace.FallenPartsDestroyHeight)
+	hrp.Velocity = Vector3.new(moveVec.X, yOffset * 2, moveVec.Z)
+end
+
+-- AUTO STEALER --
+local autoStealerSpeed = 35
+local autoStealerLevitateHeight = 2
+
+local function applyAutoStealer()
+	if not autoStealerEnabled then return end
+	hrp = hrp or getHRP()
+	if not hrp then return end
+
+	local camCF = camera.CFrame
+	local moveVec = Vector3.new()
+
+	if UIS:IsKeyDown(Enum.KeyCode.W) then moveVec += camCF.LookVector end
+	if UIS:IsKeyDown(Enum.KeyCode.S) then moveVec -= camCF.LookVector end
+	if UIS:IsKeyDown(Enum.KeyCode.A) then moveVec -= camCF.RightVector end
+	if UIS:IsKeyDown(Enum.KeyCode.D) then moveVec += camCF.RightVector end
+
+	if moveVec.Magnitude > 0 then
+		moveVec = Vector3.new(moveVec.X, 0, moveVec.Z).Unit * autoStealerSpeed
+	else
+		moveVec = Vector3.new(0,0,0)
+	end
+
+	local goalY = autoStealerLevitateHeight
+	local yOffset = goalY - (hrp.Position.Y - workspace.FallenPartsDestroyHeight)
+	hrp.Velocity = Vector3.new(moveVec.X, yOffset * 2, moveVec.Z)
+end
+
+-- TELEPORT FUNCTION
+local function teleportToBaseplate()
+	local baseplate = workspace:FindFirstChild("Baseplate") or workspace:FindFirstChild("baseplate")
+	if baseplate and baseplate:IsA("BasePart") then
+		hrp = hrp or getHRP()
+		if hrp then
+			hrp.CFrame = CFrame.new(baseplate.Position + Vector3.new(0, 5, 0))
+		end
+	end
+end
+
+-- Key submit logic
+keySubmit.MouseButton1Click:Connect(function()
+	local inputKey = keyBox.Text
+	if inputKey == ACCESS_KEY then
 		authorized = true
-		frame:Destroy()
+		keyGui:Destroy()
+		gui.Enabled = true
 		StarterGui:SetCore("SendNotification", {
-			Title = "Anti Slap Ready";
-			Text = "Stay safe from nearby players.";
-			Duration = 5;
+			Title = "Access Granted",
+			Text = "Welcome! Use the GUI to control features.",
+			Duration = 5
 		})
 	else
 		StarterGui:SetCore("SendNotification", {
-			Title = "Invalid Key";
-			Text = "Please follow & enter the correct key.";
-			Duration = 5;
+			Title = "Invalid Key",
+			Text = "Please enter the correct key.",
+			Duration = 5
 		})
 	end
 end)
 
--- MAIN LOOP
-RS:BindToRenderStep("AntiSlapFloat", Enum.RenderPriority.Character.Value + 1, function()
+-- Toggle float with Q
+UIS.InputBegan:Connect(function(input, gameProcessed)
+	if not authorized or gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.Q then
+		floatEnabled = not floatEnabled
+		StarterGui:SetCore("SendNotification", {
+			Title = "Float",
+			Text = floatEnabled and "Enabled" or "Disabled",
+			Duration = 3
+		})
+	end
+end)
+
+-- Toggle autostealer with E
+UIS.InputBegan:Connect(function(input, gameProcessed)
+	if not authorized or gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.E then
+		autoStealerEnabled = not autoStealerEnabled
+		StarterGui:SetCore("SendNotification", {
+			Title = "Auto Stealer",
+			Text = autoStealerEnabled and "Enabled" or "Disabled",
+			Duration = 3
+		})
+	end
+end)
+
+-- Button logic
+speedToggleBtn.MouseButton1Click:Connect(function()
+	if not authorized then return end
+	local newSpeed = tonumber(speedInput.Text)
+	if newSpeed and newSpeed > 0 then
+		userSpeedValue = newSpeed
+		StarterGui:SetCore("SendNotification", {
+			Title = "Speed Updated",
+			Text = "New float speed: " .. tostring(userSpeedValue),
+			Duration = 3
+		})
+	else
+		StarterGui:SetCore("SendNotification", {
+			Title = "Invalid Speed",
+			Text = "Please enter a valid positive number.",
+			Duration = 3
+		})
+	end
+end)
+
+espToggleBtn.MouseButton1Click:Connect(function()
+	if not authorized then return end
+	espEnabled = not espEnabled
+	toggleESP(espEnabled)
+	StarterGui:SetCore("SendNotification", {
+		Title = "ESP",
+		Text = espEnabled and "Enabled" or "Disabled",
+		Duration = 3
+	})
+end)
+
+teleportBtn.MouseButton1Click:Connect(function()
+	if not authorized then return end
+	teleportToBaseplate()
+	StarterGui:SetCore("SendNotification", {
+		Title = "Teleport",
+		Text = "Teleported to baseplate.",
+		Duration = 3
+	})
+end)
+
+-- Main loop to apply movement and auto stealer
+RunService.Heartbeat:Connect(function()
 	if authorized then
-		local tooClose = isPlayerTooClose()
-
-		if tooClose and not antiSlapEnabled then
-			antiSlapEnabled = true
-			StarterGui:SetCore("SendNotification", {
-				Title = "Anti Slap Activated";
-				Text = "Floating to avoid contact!";
-				Duration = 3;
-			})
-		elseif not tooClose and antiSlapEnabled then
-			antiSlapEnabled = false
-			StarterGui:SetCore("SendNotification", {
-				Title = "Anti Slap Deactivated";
-				Text = "Safe distance. Float off.";
-				Duration = 3;
-			})
-		end
-
-		if antiSlapEnabled and player.Character then
-			local camCF = camera.CFrame
-			local moveVec = Vector3.new()
-
-			if UIS:IsKeyDown(Enum.KeyCode.W) then moveVec += camCF.LookVector end
-			if UIS:IsKeyDown(Enum.KeyCode.S) then moveVec -= camCF.LookVector end
-			if UIS:IsKeyDown(Enum.KeyCode.A) then moveVec -= camCF.RightVector end
-			if UIS:IsKeyDown(Enum.KeyCode.D) then moveVec += camCF.RightVector end
-
-			moveVec = Vector3.new(moveVec.X, 0, moveVec.Z).Unit * SPEED
-
-			local yOffset = FLOAT_HEIGHT - (hrp.Position.Y - workspace.FallenPartsDestroyHeight)
-			hrp.Velocity = Vector3.new(moveVec.X, yOffset * 2, moveVec.Z)
+		if autoStealerEnabled then
+			applyAutoStealer()
+		elseif floatEnabled then
+			applyFloatMovement()
 		end
 	end
 end)
