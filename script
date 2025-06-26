@@ -9,7 +9,7 @@ local camera = workspace.CurrentCamera
 
 -- Settings
 local floatHeightOffset = 12
-local floatSpeed = 16
+local floatSpeed = 25
 local teleportDistance = 7
 
 local floating = false
@@ -18,6 +18,9 @@ local humanoid = nil
 
 local bodyPos = nil
 local bodyVel = nil
+
+-- Detect if user is on mobile
+local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
 -- GUI Setup
 local ScreenGui = Instance.new("ScreenGui")
@@ -28,7 +31,7 @@ ScreenGui.Parent = player:WaitForChild("PlayerGui")
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 380, 0, 260)
 frame.Position = UDim2.new(0.5, -190, 0.4, -130)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BackgroundColor3 = Color3.fromRGB(102, 45, 145) -- Purple color
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -37,104 +40,67 @@ frame.Parent = ScreenGui
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "Steal a Brainrot Helper"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Text = "Made by 3r00"
+title.TextColor3 = Color3.fromRGB(230, 230, 230)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 22
 title.Parent = frame
 
-local tabsFrame = Instance.new("Frame")
-tabsFrame.Size = UDim2.new(1, 0, 0, 30)
-tabsFrame.Position = UDim2.new(0, 0, 0, 30)
-tabsFrame.BackgroundTransparency = 1
-tabsFrame.Parent = frame
+-- Main Page (no tabs, everything in one frame)
+local mainPage = Instance.new("Frame")
+mainPage.Size = UDim2.new(1, 0, 1, -40)
+mainPage.Position = UDim2.new(0, 0, 0, 40)
+mainPage.BackgroundTransparency = 1
+mainPage.Parent = frame
 
-local tabs = {"Main", "Visual", "Misc"}
-local tabButtons = {}
-local pages = {}
-
-local function createTabButton(name, pos)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 120, 1, 0)
-    btn.Position = UDim2.new(0, pos, 0, 0)
-    btn.Text = name
-    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 18
-    btn.Parent = tabsFrame
-    return btn
-end
-
-local function createPage()
-    local page = Instance.new("Frame")
-    page.Size = UDim2.new(1, 0, 1, -60)
-    page.Position = UDim2.new(0, 0, 0, 60)
-    page.BackgroundTransparency = 1
-    page.Visible = false
-    page.Parent = frame
-    return page
-end
-
-for i, name in ipairs(tabs) do
-    local btn = createTabButton(name, (i-1)*120)
-    tabButtons[name] = btn
-    pages[name] = createPage()
-end
-
-local function switchTab(tabName)
-    for name, page in pairs(pages) do
-        page.Visible = (name == tabName)
-        tabButtons[name].BackgroundColor3 = (name == tabName) and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(45,45,45)
-    end
-end
-switchTab("Main")
-
-for name, btn in pairs(tabButtons) do
-    btn.MouseButton1Click:Connect(function()
-        switchTab(name)
-    end)
-end
-
--- Main Tab UI
-local mainPage = pages["Main"]
-
+-- Float toggle button (always visible)
 local floatToggle = Instance.new("TextButton")
 floatToggle.Size = UDim2.new(0, 180, 0, 40)
-floatToggle.Position = UDim2.new(0.5, -90, 0, 20)
-floatToggle.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+floatToggle.Position = UDim2.new(0.5, -90, 0, 10)
+floatToggle.BackgroundColor3 = Color3.fromRGB(85, 45, 145)
 floatToggle.TextColor3 = Color3.new(1,1,1)
 floatToggle.Font = Enum.Font.GothamBold
 floatToggle.TextSize = 20
-floatToggle.Text = "Toggle Float (Q)"
+floatToggle.Text = "Toggle Float Q"
 floatToggle.Parent = mainPage
 
+-- Speed label and box
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(0, 100, 0, 30)
-speedLabel.Position = UDim2.new(0, 40, 0, 80)
+speedLabel.Position = UDim2.new(0, 20, 0, 70)
 speedLabel.BackgroundTransparency = 1
 speedLabel.TextColor3 = Color3.new(1,1,1)
 speedLabel.Font = Enum.Font.Gotham
 speedLabel.TextSize = 18
-speedLabel.Text = "Speed:"
+speedLabel.Text = "Float Speed:"
 speedLabel.TextXAlignment = Enum.TextXAlignment.Left
 speedLabel.Parent = mainPage
 
 local speedBox = Instance.new("TextBox")
 speedBox.Size = UDim2.new(0, 100, 0, 30)
-speedBox.Position = UDim2.new(0, 140, 0, 80)
-speedBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+speedBox.Position = UDim2.new(0, 130, 0, 70)
+speedBox.BackgroundColor3 = Color3.fromRGB(85, 45, 145)
 speedBox.TextColor3 = Color3.new(1,1,1)
 speedBox.Font = Enum.Font.Gotham
 speedBox.TextSize = 18
 speedBox.Text = tostring(floatSpeed)
 speedBox.ClearTextOnFocus = false
 speedBox.Parent = mainPage
+local anticheatNote = Instance.new("TextLabel")
+anticheatNote.Size = UDim2.new(0, 300, 0, 20)
+anticheatNote.Position = UDim2.new(0, 20, 0, 110)
+anticheatNote.BackgroundTransparency = 1
+anticheatNote.TextColor3 = Color3.new(0, 0, 0)
+anticheatNote.Font = Enum.Font.Gotham
+anticheatNote.TextSize = 14
+anticheatNote.Text = "Use items that give speed to evade anti-cheat"
+anticheatNote.TextXAlignment = Enum.TextXAlignment.Left
+anticheatNote.Parent = mainPage
 
 speedBox.FocusLost:Connect(function(enterPressed)
     if enterPressed then
         local val = tonumber(speedBox.Text)
-        if val and val > 0 and val <= 100 then
+        if val and val > 0 and val <= 110 then -- max speed limit 110
             floatSpeed = val
             speedBox.Text = tostring(floatSpeed)
         else
@@ -143,19 +109,32 @@ speedBox.FocusLost:Connect(function(enterPressed)
     end
 end)
 
--- Visual Tab UI
-local visualPage = pages["Visual"]
+-- Teleport spam toggle button (visible only on mobile)
+local teleportSpamToggle
+if isMobile then
+    teleportSpamToggle = Instance.new("TextButton")
+    teleportSpamToggle.Size = UDim2.new(0, 180, 0, 40)
+    teleportSpamToggle.Position = UDim2.new(0.5, -90, 0, 120)
+    teleportSpamToggle.BackgroundColor3 = Color3.fromRGB(85, 45, 145)
+    teleportSpamToggle.TextColor3 = Color3.new(1,1,1)
+    teleportSpamToggle.Font = Enum.Font.GothamBold
+    teleportSpamToggle.TextSize = 20
+    teleportSpamToggle.Text = "Toggle Teleport Spam"
+    teleportSpamToggle.Parent = mainPage
+end
 
+-- ESP toggle button
 local espToggle = Instance.new("TextButton")
 espToggle.Size = UDim2.new(0, 180, 0, 40)
-espToggle.Position = UDim2.new(0.5, -90, 0, 20)
-espToggle.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+espToggle.Position = UDim2.new(0.5, -90, 0, 170)
+espToggle.BackgroundColor3 = Color3.fromRGB(85, 45, 145)
 espToggle.TextColor3 = Color3.new(1,1,1)
 espToggle.Font = Enum.Font.GothamBold
 espToggle.TextSize = 20
 espToggle.Text = "Toggle ESP"
-espToggle.Parent = visualPage
+espToggle.Parent = mainPage
 
+-- ESP Implementation
 local espEnabled = false
 local espBoxes = {}
 
@@ -246,20 +225,7 @@ end)
 
 RunService.RenderStepped:Connect(updateESP)
 
--- Misc Tab UI
-local miscPage = pages["Misc"]
-
-local teleportLabel = Instance.new("TextLabel")
-teleportLabel.Size = UDim2.new(1, 0, 0, 40)
-teleportLabel.Position = UDim2.new(0, 0, 0, 20)
-teleportLabel.BackgroundTransparency = 1
-teleportLabel.TextColor3 = Color3.new(1,1,1)
-teleportLabel.Font = Enum.Font.Gotham
-teleportLabel.TextSize = 18
-teleportLabel.Text = "Press T to teleport 7 studs forward"
-teleportLabel.Parent = miscPage
-
--- Floating functions
+-- Floating functions (same as before)
 local function startFloating()
     if floating then return end
     if not player.Character then return end
@@ -269,24 +235,18 @@ local function startFloating()
 
     humanoid.PlatformStand = true
 
-    -- Teleport up instantly by 12 studs
-    local currentPos = hrp.Position
-    local targetPos = Vector3.new(currentPos.X, currentPos.Y + floatHeightOffset, currentPos.Z)
-    hrp.CFrame = CFrame.new(targetPos)
+    -- Teleport up instantly by floatHeightOffset
+    hrp.CFrame = CFrame.new(hrp.Position + Vector3.new(0, floatHeightOffset, 0))
 
-    -- Lock vertical position exactly at new height
     bodyPos = Instance.new("BodyPosition")
-    bodyPos.Name = "FloatBodyPosition"
-    bodyPos.MaxForce = Vector3.new(0, 1e5, 0) -- vertical only
+    bodyPos.MaxForce = Vector3.new(0, 1e5, 0)
     bodyPos.P = 1e4
     bodyPos.D = 1e3
-    bodyPos.Position = targetPos
+    bodyPos.Position = hrp.Position + Vector3.new(0, floatHeightOffset, 0)
     bodyPos.Parent = hrp
 
-    -- Horizontal movement
     bodyVel = Instance.new("BodyVelocity")
-    bodyVel.Name = "FloatBodyVelocity"
-    bodyVel.MaxForce = Vector3.new(1e5, 0, 1e5) -- horizontal only
+    bodyVel.MaxForce = Vector3.new(1e5, 0, 1e5)
     bodyVel.P = 1e4
     bodyVel.Velocity = Vector3.new(0, 0, 0)
     bodyVel.Parent = hrp
@@ -311,10 +271,8 @@ end
 
 RunService.Heartbeat:Connect(function()
     if floating and hrp and bodyPos and bodyVel then
-        -- Keep Y locked to the float height (simulate platform)
         bodyPos.Position = Vector3.new(hrp.Position.X, bodyPos.Position.Y, hrp.Position.Z)
 
-        -- Camera relative horizontal movement
         local camCF = camera.CFrame
         local forward = camCF.LookVector
         local right = camCF.RightVector
@@ -336,27 +294,52 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-
-    if input.KeyCode == Enum.KeyCode.Q then
-        if floating then
-            stopFloating()
-        else
-            startFloating()
-        end
-    elseif input.KeyCode == Enum.KeyCode.T then
+-- Teleport spam toggle logic
+local teleportSpamming = false
+local function teleportSpam()
+    while teleportSpamming do
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = player.Character.HumanoidRootPart
-            local forwardVector = hrp.CFrame.LookVector
-            local targetPos = hrp.Position + forwardVector * teleportDistance
-            local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-            local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos)})
-            tween:Play()
+            local forwardVector = camera.CFrame.LookVector
+            local targetPos = hrp.Position + Vector3.new(forwardVector.X, 2, forwardVector.Z).Unit * teleportDistance
+            -- Raycast down to find safe position
+            local rayOrigin = targetPos + Vector3.new(0, 5, 0)
+            local rayDir = Vector3.new(0, -50, 0)
+            local rayParams = RaycastParams.new()
+            rayParams.FilterDescendantsInstances = {player.Character}
+            rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+            local raycastResult = workspace:Raycast(rayOrigin, rayDir, rayParams)
+            if raycastResult then
+                targetPos = Vector3.new(targetPos.X, raycastResult.Position.Y + 2, targetPos.Z)
+            else
+                targetPos = targetPos + Vector3.new(0, 2, 0)
+            end
+            hrp.CFrame = CFrame.new(targetPos)
+        end
+        task.wait(teleportSpamDelay / 1000)
+    end
+end
+
+-- PC keybinds
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not isMobile then
+        if input.KeyCode == Enum.KeyCode.Q then
+            if floating then
+                stopFloating()
+            else
+                startFloating()
+            end
+        elseif input.KeyCode == Enum.KeyCode.T then
+            teleportSpamming = not teleportSpamming
+            if teleportSpamming then
+                task.spawn(teleportSpam)
+            end
         end
     end
 end)
 
+-- Button clicks
 floatToggle.MouseButton1Click:Connect(function()
     if floating then
         stopFloating()
@@ -365,4 +348,16 @@ floatToggle.MouseButton1Click:Connect(function()
     end
 end)
 
-print("Steal a Brainrot Helper loaded! Use Q to toggle float, T to teleport forward, toggle ESP in Visual tab.")
+if teleportSpamToggle then
+    teleportSpamToggle.MouseButton1Click:Connect(function()
+        teleportSpamming = not teleportSpamming
+        if teleportSpamming then
+            task.spawn(teleportSpam)
+            teleportSpamToggle.Text = "Stop Teleport Spam"
+        else
+            teleportSpamToggle.Text = "Toggle Teleport Spam"
+        end
+    end)
+end
+
+print("Steal a Brainrot Helper loaded! Float (Q or button), Teleport Spam (T or mobile button), ESP toggle.")
